@@ -28,7 +28,7 @@ const isAffirmative = (v: string) => TRUE_VALUES.has(v.trim().toLowerCase());
 
 const colors = {
   bg: 'rgb(255 255 255 / 3%)',
-  border: 'rgb(255 255 255 / 10%)',
+  border: 'rgb(255 255 255 / 15%)',
   onSurface: '#e2e2e8',
   onSurfaceVariant: '#b9cacb',
   primary: '#00dbe9',
