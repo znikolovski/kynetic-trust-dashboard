@@ -1,0 +1,2 @@
+Built widget bundles (comparison-table.js, etc.) land here after
+`npm run build:widgets`. Not committed — see widgets/build.mjs.

@@ -1,0 +1,105 @@
+name: Build, deploy, and release the widget to EDS
+
+# Replaces the manual "build the widget, copy it somewhere" step. On every
+# push: build (including the widget bundle + manifest.json), deploy, then
+# smoke-test the ACTUAL deployed URL the same way the EDS site would mount
+# it. Only on `main`, once that smoke test passes, this also opens (via a
+# repository_dispatch) an automated release PR in the kynetic-trust (EDS)
+# repo — that PR is what actually exposes the new version to
+# securbank.com visitors, and only after EDS's OWN CI independently
+# verifies it against a real EDS preview. See ARCHITECTURE.md §3.5.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    outputs:
+      deploy-url: ${{ steps.deploy.outputs.url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build # runs `build:widgets` first, see package.json
+
+      - name: Deploy to Vercel
+        id: deploy
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          npm i -g vercel@latest
+          vercel pull --yes --environment=${{ github.ref == 'refs/heads/main' && 'production' || 'preview' }} --token="$VERCEL_TOKEN"
+          vercel build ${{ github.ref == 'refs/heads/main' && '--prod' || '' }} --token="$VERCEL_TOKEN"
+          url=$(vercel deploy --prebuilt ${{ github.ref == 'refs/heads/main' && '--prod' || '' }} --token="$VERCEL_TOKEN")
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+
+  smoke-test:
+    needs: build-and-deploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Verify the widget contract against the live deploy
+        run: node scripts/smoke-test-widget.mjs "${{ needs.build-and-deploy.outputs.deploy-url }}"
+
+  # For `main`, promoting a Vercel deployment to the production alias only
+  # after this job succeeds is what should gate the dispatch below going out
+  # — see Vercel's `vercel promote` docs for wiring that in once the project
+  # is provisioned; until then this dispatches against whatever `deploy-url`
+  # build-and-deploy produced for `main`.
+
+  release-to-eds:
+    if: github.ref == 'refs/heads/main'
+    needs: [build-and-deploy, smoke-test]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Read the deployed manifest and notify kynetic-trust
+        env:
+          # Fine-grained PAT scoped to Contents+PRs on znikolovski/kynetic-trust
+          # only — NOT this repo's own token, since that can't dispatch to a
+          # different repository.
+          EDS_DISPATCH_TOKEN: ${{ secrets.EDS_DISPATCH_TOKEN }}
+          DEPLOY_URL: ${{ needs.build-and-deploy.outputs.deploy-url }}
+        run: |
+          manifest=$(curl -sf "$DEPLOY_URL/widgets/manifest.json")
+          file=$(echo "$manifest" | node -pe 'JSON.parse(require("fs").readFileSync(0)).widgets["comparison-table"].file')
+          version=$(echo "$manifest" | node -pe 'JSON.parse(require("fs").readFileSync(0)).buildId')
+
+          curl -sf -X POST \
+            -H "Authorization: Bearer $EDS_DISPATCH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/znikolovski/kynetic-trust/dispatches" \
+            -d @- <<JSON
+          {
+            "event_type": "widget-release",
+            "client_payload": {
+              "widget": "comparison-table",
+              "appOrigin": "$DEPLOY_URL",
+              "file": "$file",
+              "version": "$version",
+              "sourceCommit": "${{ github.sha }}",
+              "deployUrl": "$DEPLOY_URL",
+              "runUrl": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            }
+          }
+          JSON
