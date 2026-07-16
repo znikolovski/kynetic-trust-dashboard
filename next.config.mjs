@@ -1,12 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  experimental: {
-    // React Server Components for account/transaction data keeps the
-    // authenticated shell fast — most rendering happens on the server,
-    // client JS is limited to the small set of interactive widgets.
-    typedRoutes: true,
-  },
+  typedRoutes: true,
   images: {
     // AEM Cloud Service Dynamic Media / DAM asset delivery domain(s) go here
     remotePatterns: [

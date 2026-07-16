@@ -16,7 +16,13 @@ import { execSync } from 'node:child_process';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const outDir = resolve(__dirname, '..', 'public', 'widgets');
 
-const entries = ['comparison-table.tsx'];
+const entries = [
+  'comparison-table.tsx',
+  'login-modal.tsx',
+  'registration-flow.tsx',
+  'mortgage-calculator.tsx',
+  'transaction-summary.tsx',
+];
 
 function gitSha() {
   try {

@@ -1,0 +1,42 @@
+/* stylelint-disable max-line-length */
+
+/*
+ * Kinetic Trust type system: Hanken Grotesk (display/headline), Adobe Clean (body),
+ * JetBrains Mono (labels/data).
+ *
+ * Hanken Grotesk and JetBrains Mono are loaded from Google Fonts in app/layout.tsx.
+ *
+ * Adobe Clean: self-hosted OTF from Adobe Fonts (public/fonts/adobe-clean-regular.otf).
+ * To switch to a Typekit embed, add:
+ *   <link rel="stylesheet" href="https://use.typekit.net/<kit-id>.css" />
+ * to app/layout.tsx and remove the adobe-clean @font-face block below.
+ * Font-family name 'adobe-clean' matches the Typekit CSS name — no token changes needed.
+ */
+
+@font-face {
+  font-family: 'adobe-clean';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/adobe-clean-regular.otf') format('opentype');
+}
+
+/* size-matched fallbacks so CLS stays at 0 before the webfonts swap in */
+@font-face {
+  font-family: hanken-grotesk-fallback;
+  size-adjust: 104%;
+  ascent-override: 92%;
+  src: local('Arial');
+}
+
+@font-face {
+  font-family: adobe-clean-fallback;
+  size-adjust: 100%;
+  src: local('Helvetica Neue'), local('Arial');
+}
+
+@font-face {
+  font-family: jetbrains-mono-fallback;
+  size-adjust: 100%;
+  src: local('Menlo'), local('Consolas'), local('monospace');
+}
