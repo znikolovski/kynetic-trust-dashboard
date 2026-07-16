@@ -20,16 +20,14 @@ export default function DonutChart({ segments, size = 180, thickness = 28 }: Don
 
   const total = segments.reduce((sum, s) => sum + s.value, 0);
 
-  // Build stroke-dasharray arcs
-  let offset = 0;
-  const arcs = segments.map((seg) => {
+  // Build stroke-dasharray arcs — offset accumulated immutably via index slice
+  const arcs = segments.map((seg, i) => {
     const frac = seg.value / total;
+    const offset = segments.slice(0, i).reduce((sum, s) => sum + s.value / total, 0);
     const dash = frac * circumference;
     const gap = circumference - dash;
-    const currentOffset = offset;
-    offset += frac;
     // strokeDashoffset: start at top (rotate -90deg) minus accumulated offset
-    const dashOffset = circumference * (0.25 - currentOffset);
+    const dashOffset = circumference * (0.25 - offset);
     return { ...seg, dash, gap, dashOffset };
   });
 

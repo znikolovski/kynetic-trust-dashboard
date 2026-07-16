@@ -73,5 +73,4 @@ const manifest = {
 
 writeFileSync(resolve(outDir, 'manifest.json'), JSON.stringify(manifest, null, 2));
 
-// eslint-disable-next-line no-console
 console.log(`Built ${entries.length} widget bundle(s), manifest buildId=${buildId}`);

@@ -130,10 +130,9 @@ const TOTAL_STEPS = 5;
 const STEP_NAMES = ['Choose Your Path', 'Security Setup', 'Account Details', 'Review & Confirm', 'Complete'];
 
 export default function RegistrationFlow({ onComplete, onCancel }: RegistrationFlowProps) {
-  const [reducedMotion, setReducedMotion] = useState(false);
-  useEffect(() => {
-    setReducedMotion(window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-  }, []);
+  const [reducedMotion] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+  );
   const motion: MotionFn = (value) => (reducedMotion ? undefined : value);
 
   const [step, setStep] = useState(1);
