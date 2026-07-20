@@ -85,7 +85,7 @@ export default function SignInPage() {
 
         {/* Logo + brand */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-          <Image src="/securbank-logo.svg" alt="SecurBank" width={56} height={56} />
+          <Image src="/securbank-logo.jpg" alt="SecurBank" width={56} height={56} />
           <div style={{ textAlign: 'center' }}>
             <div
               style={{

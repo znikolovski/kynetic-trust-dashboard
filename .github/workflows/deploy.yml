@@ -60,6 +60,8 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - name: Verify the widget contract against the live deploy
+        env:
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         run: node scripts/smoke-test-widget.mjs "${{ needs.build-and-deploy.outputs.deploy-url }}"
 
   # For `main`, promoting a Vercel deployment to the production alias only
@@ -79,9 +81,12 @@ jobs:
           # only — NOT this repo's own token, since that can't dispatch to a
           # different repository.
           EDS_DISPATCH_TOKEN: ${{ secrets.EDS_DISPATCH_TOKEN }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
           DEPLOY_URL: ${{ needs.build-and-deploy.outputs.deploy-url }}
         run: |
-          manifest=$(curl -sf "$DEPLOY_URL/widgets/manifest.json")
+          bypass_flag=""
+          [ -n "$VERCEL_AUTOMATION_BYPASS_SECRET" ] && bypass_flag="-H x-vercel-protection-bypass:$VERCEL_AUTOMATION_BYPASS_SECRET"
+          manifest=$(curl -sf $bypass_flag "$DEPLOY_URL/widgets/manifest.json")
           file=$(echo "$manifest" | node -pe 'JSON.parse(require("fs").readFileSync(0)).widgets["comparison-table"].file')
           version=$(echo "$manifest" | node -pe 'JSON.parse(require("fs").readFileSync(0)).buildId')
 

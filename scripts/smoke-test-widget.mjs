@@ -12,6 +12,9 @@
  * track" (i.e. before promoting a Vercel preview to the production alias).
  *
  * Usage: node scripts/smoke-test-widget.mjs https://app.securbank.com
+ *
+ * Set VERCEL_AUTOMATION_BYPASS_SECRET to bypass Vercel Deployment Protection
+ * on preview deployments.
  */
 import { chromium } from 'playwright';
 
@@ -22,6 +25,31 @@ if (!baseUrl) {
 }
 
 const READY_TIMEOUT_MS = 10_000;
+const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+const bypassHeaders = bypassSecret ? { 'x-vercel-protection-bypass': bypassSecret } : {};
+
+// Fetch the manifest in Node.js so we can attach bypass headers and get
+// clear error messages before spinning up a browser.
+const manifestUrl = `${baseUrl}/widgets/manifest.json`;
+const manifestRes = await fetch(manifestUrl, { headers: bypassHeaders });
+if (!manifestRes.ok) {
+  console.error(`FAIL: manifest.json ${manifestRes.status} at ${manifestUrl}`);
+  process.exit(1);
+}
+const contentType = manifestRes.headers.get('content-type') ?? '';
+if (!contentType.includes('json')) {
+  const preview = (await manifestRes.text()).slice(0, 300);
+  console.error(`FAIL: manifest.json has unexpected content-type: ${contentType}`);
+  console.error(`Body preview: ${preview}`);
+  process.exit(1);
+}
+const manifest = await manifestRes.json();
+const entry = manifest.widgets?.['comparison-table'];
+if (!entry?.file) {
+  console.error('FAIL: manifest missing comparison-table entry');
+  console.error('manifest:', JSON.stringify(manifest));
+  process.exit(1);
+}
 
 const browser = await chromium.launch();
 try {
@@ -29,22 +57,21 @@ try {
   const consoleErrors = [];
   page.on('pageerror', (err) => consoleErrors.push(String(err)));
 
-  // Same-origin navigation so manifest.json / the widget bundle / the API
-  // route all load without needing to fake cross-origin CORS in the test.
+  // Bypass Deployment Protection for all browser requests (page nav + widget fetch).
+  if (bypassSecret) {
+    await page.setExtraHTTPHeaders(bypassHeaders);
+  }
+
+  // Same-origin navigation so the widget bundle / the API route all load
+  // without needing to fake cross-origin CORS in the test.
   await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
 
-  const result = await page.evaluate(async ({ timeoutMs }) => {
-    const res = await fetch('/widgets/manifest.json');
-    if (!res.ok) throw new Error(`manifest.json ${res.status}`);
-    const manifest = await res.json();
-    const entry = manifest.widgets?.['comparison-table'];
-    if (!entry?.file) throw new Error('manifest missing comparison-table entry');
-
+  const result = await page.evaluate(async ({ timeoutMs, widgetFile }) => {
     await new Promise((res2, rej2) => {
       const script = document.createElement('script');
-      script.src = entry.file;
+      script.src = widgetFile;
       script.onload = res2;
-      script.onerror = () => rej2(new Error(`failed to load ${entry.file}`));
+      script.onerror = () => rej2(new Error(`failed to load ${widgetFile}`));
       document.head.append(script);
     });
 
@@ -60,8 +87,8 @@ try {
 
     const becameReady = await ready;
     const rowCount = el.shadowRoot?.querySelectorAll('tbody tr').length ?? 0;
-    return { becameReady, rowCount, manifestBuildId: manifest.buildId };
-  }, { timeoutMs: READY_TIMEOUT_MS });
+    return { becameReady, rowCount };
+  }, { timeoutMs: READY_TIMEOUT_MS, widgetFile: entry.file });
 
   if (consoleErrors.length) {
     console.error('Page errors during smoke test:', consoleErrors);
@@ -76,7 +103,7 @@ try {
     process.exit(1);
   }
 
-  console.log(`OK: comparison-table widget ready with ${result.rowCount} rows (manifest buildId=${result.manifestBuildId})`);
+  console.log(`OK: comparison-table widget ready with ${result.rowCount} rows (manifest buildId=${manifest.buildId})`);
 } finally {
   await browser.close();
 }

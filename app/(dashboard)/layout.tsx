@@ -38,7 +38,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           href={'/' as any}
           style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}
         >
-          <Image src="/securbank-logo.svg" alt="SecurBank" width={32} height={32} />
+          <Image src="/securbank-logo.jpg" alt="SecurBank" width={32} height={32} />
           <span
             style={{
               fontFamily: 'var(--font-heading)',
