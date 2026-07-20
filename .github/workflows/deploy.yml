@@ -51,7 +51,7 @@ jobs:
           # Vercel's CDN serves them at /widgets/* with priority over the
           # Next.js server function (Build Output API: static beats function).
           mkdir -p .vercel/output/static/widgets
-          cp public/widgets/* .vercel/output/static/widgets/
+          cp -n public/widgets/* .vercel/output/static/widgets/
 
           url=$(vercel deploy --prebuilt ${{ github.ref == 'refs/heads/main' && '--prod' || '' }} --token="$VERCEL_TOKEN")
           echo "url=$url" >> "$GITHUB_OUTPUT"
