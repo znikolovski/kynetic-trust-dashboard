@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 type ComparisonFeature = { feature: string; values: string[] };
 type ComparisonDataset = {
@@ -46,6 +46,7 @@ export default function ComparisonWidget({
   const [data, setData] = useState<ComparisonDataset | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [estimate, setEstimate] = useState(initialEstimate);
+  const readyFired = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -57,7 +58,6 @@ export default function ComparisonWidget({
       .then((json: ComparisonDataset) => {
         if (cancelled) return;
         setData(json);
-        onReady?.();
       })
       .catch((err) => {
         if (!cancelled) setError(String(err));
@@ -65,6 +65,15 @@ export default function ComparisonWidget({
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [apiBase, dataset]);
+
+  // Fire onReady after React commits the rows to the DOM — not inside the
+  // fetch .then(), which runs before React's reconciler has updated the DOM.
+  useEffect(() => {
+    if (data && !readyFired.current) {
+      readyFired.current = true;
+      onReady?.();
+    }
+  }, [data, onReady]);
 
   const bestTierIndex = useMemo(() => {
     if (!data) return -1;
