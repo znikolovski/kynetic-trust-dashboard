@@ -28,6 +28,17 @@ const READY_TIMEOUT_MS = 10_000;
 const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
 const bypassHeaders = bypassSecret ? { 'x-vercel-protection-bypass': bypassSecret } : {};
 
+if (!bypassSecret) {
+  console.warn(
+    'WARNING: VERCEL_AUTOMATION_BYPASS_SECRET is not set. ' +
+    'Requests to Vercel preview deployments with Standard Protection enabled ' +
+    'will be intercepted by Vercel\'s auth wall and return HTML instead of JSON. ' +
+    'Add the secret in: Vercel project → Settings → Deployment Protection → ' +
+    'Automation Bypass Secret, then add it as a GitHub secret named ' +
+    'VERCEL_AUTOMATION_BYPASS_SECRET.',
+  );
+}
+
 // Fetch the manifest in Node.js so we can attach bypass headers and get
 // clear error messages before spinning up a browser.
 const manifestUrl = `${baseUrl}/widgets/manifest.json`;
@@ -39,7 +50,14 @@ if (!manifestRes.ok) {
 const contentType = manifestRes.headers.get('content-type') ?? '';
 if (!contentType.includes('json')) {
   const preview = (await manifestRes.text()).slice(0, 300);
+  const likelyProtectionWall = preview.includes('data-dpl-id') || preview.includes('vercel');
   console.error(`FAIL: manifest.json has unexpected content-type: ${contentType}`);
+  if (likelyProtectionWall && !bypassSecret) {
+    console.error(
+      'DIAGNOSIS: The response looks like Vercel\'s Deployment Protection wall. ' +
+      'Set VERCEL_AUTOMATION_BYPASS_SECRET as a GitHub secret (see warning above).',
+    );
+  }
   console.error(`Body preview: ${preview}`);
   process.exit(1);
 }
