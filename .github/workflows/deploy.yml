@@ -45,6 +45,14 @@ jobs:
           npm i -g vercel@latest
           vercel pull --yes --environment=${{ github.ref == 'refs/heads/main' && 'production' || 'preview' }} --token="$VERCEL_TOKEN"
           vercel build ${{ github.ref == 'refs/heads/main' && '--prod' || '' }} --token="$VERCEL_TOKEN"
+
+          # The @vercel/next adapter does not copy gitignored public/ files into
+          # .vercel/output/static/. Explicitly inject the widget artifacts so
+          # Vercel's CDN serves them at /widgets/* with priority over the
+          # Next.js server function (Build Output API: static beats function).
+          mkdir -p .vercel/output/static/widgets
+          cp public/widgets/* .vercel/output/static/widgets/
+
           url=$(vercel deploy --prebuilt ${{ github.ref == 'refs/heads/main' && '--prod' || '' }} --token="$VERCEL_TOKEN")
           echo "url=$url" >> "$GITHUB_OUTPUT"
 
