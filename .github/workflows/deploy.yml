@@ -89,6 +89,11 @@ jobs:
           manifest=$(curl -sf $bypass_flag "$DEPLOY_URL/widgets/manifest.json")
           file=$(echo "$manifest" | node -pe 'JSON.parse(require("fs").readFileSync(0)).widgets["comparison-table"].file')
           version=$(echo "$manifest" | node -pe 'JSON.parse(require("fs").readFileSync(0)).buildId')
+          # Use the stable production alias, not the unique deployment URL.
+          # DEPLOY_URL is a per-deployment hash URL behind Vercel SSO; the
+          # production alias is what public visitors (and the EDS widget loader)
+          # can actually reach.
+          prod_origin="https://kynetic-trust-dashboard.vercel.app"
 
           curl -sf -X POST \
             -H "Authorization: Bearer $EDS_DISPATCH_TOKEN" \
@@ -99,7 +104,7 @@ jobs:
             "event_type": "widget-release",
             "client_payload": {
               "widget": "comparison-table",
-              "appOrigin": "$DEPLOY_URL",
+              "appOrigin": "$prod_origin",
               "file": "$file",
               "version": "$version",
               "sourceCommit": "${{ github.sha }}",
