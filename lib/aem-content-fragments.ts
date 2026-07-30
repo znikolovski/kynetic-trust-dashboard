@@ -15,7 +15,13 @@
  * This file stubs that call so the app runs standalone during the design
  * phase; swap `mockFetchContentFragment` for `fetchPersistedQuery` once an
  * AEM Cloud Service GraphQL endpoint + IMS service credentials exist.
+ *
+ * All numeric rate values come from lib/rates.ts — the single source of
+ * truth shared with the public /api/rates endpoint and the EDS placeholder
+ * decorator. Change a rate there and every surface (static HTML, interactive
+ * widget, comparison table) updates in lockstep.
  */
+import { getRateByKey } from './rates';
 
 export type AccountSummary = {
   id: string;
@@ -51,15 +57,23 @@ export type ComparisonDataset = {
 
 const TRUE_VALUES = new Set(['yes', 'true', 'check']);
 
+const std = getRateByKey('standard-apy');
+const hya = getRateByKey('high-yield-apy');
+const ins = getRateByKey('institutional-apy');
+const premFee = getRateByKey('premium-monthly-fee');
+const insFee = getRateByKey('institutional-monthly-fee');
+const cbs = getRateByKey('cashback-standard');
+const cbp = getRateByKey('cashback-premium');
+
 const MOCK_COMPARISON_DATASETS: Record<string, ComparisonDataset> = {
   tiers: {
     id: 'tiers',
     tiers: [
       { name: 'Standard', monthlyPrice: 0, ctaHref: '/join?tier=standard' },
-      { name: 'Premium', monthlyPrice: 49, ctaHref: '/join?tier=premium' },
-      { name: 'Institutional', monthlyPrice: 499, ctaHref: '/join?tier=institutional' },
+      { name: 'Premium', monthlyPrice: premFee.numeric, ctaHref: '/join?tier=premium' },
+      { name: 'Institutional', monthlyPrice: insFee.numeric, ctaHref: '/join?tier=institutional' },
     ],
-    ratesByTier: [2.45, 5.15, 6.4],
+    ratesByTier: [std.numeric, hya.numeric, ins.numeric],
     features: [
       { feature: 'Instant Settlement', values: ['yes', 'yes', 'yes'] },
       { feature: 'Priority Execution', values: ['no', 'yes', 'yes'] },
@@ -75,11 +89,11 @@ const MOCK_COMPARISON_DATASETS: Record<string, ComparisonDataset> = {
       { name: 'Standard', monthlyPrice: 0, ctaHref: '/join' },
       { name: 'SecurBank Premium', monthlyPrice: 0, ctaHref: '/join?product=premium-savings' },
     ],
-    ratesByTier: [2.45, 5.15],
+    ratesByTier: [std.numeric, hya.numeric],
     features: [
       { feature: 'Monthly Service Fee', values: ['$0.00', '$0.00'] },
-      { feature: 'High Yield APY', values: ['2.45%', '5.15%'] },
-      { feature: 'Debit Card Cashback', values: ['1.0%', 'Up to 4.5%'] },
+      { feature: 'High Yield APY', values: [std.display, hya.display] },
+      { feature: 'Debit Card Cashback', values: [cbs.display, cbp.display] },
       { feature: 'Global ATM Access', values: ['Domestic Only', 'Global Unrestricted'] },
       { feature: 'Support Tier', values: ['Standard Digital', 'Dedicated Concierge'] },
     ],
@@ -104,7 +118,7 @@ async function fetchPersistedQuery<T>(queryName: string, params: Record<string, 
 
 const MOCK_ACCOUNTS: AccountSummary[] = [
   { id: 'acc-001', nickname: 'Everyday Checking', type: 'checking', balance: 18420.55, currency: 'USD' },
-  { id: 'acc-002', nickname: 'High-Yield Savings', type: 'savings', balance: 92310.12, currency: 'USD', apy: 5.15 },
+  { id: 'acc-002', nickname: 'High-Yield Savings', type: 'savings', balance: 92310.12, currency: 'USD', apy: hya.numeric },
   { id: 'acc-003', nickname: 'SecurBank Infinite', type: 'credit', balance: -2140.32, currency: 'USD' },
 ];
 

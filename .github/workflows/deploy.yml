@@ -70,6 +70,22 @@ jobs:
   # is provisioned; until then this dispatches against whatever `deploy-url`
   # build-and-deploy produced for `main`.
 
+  sync-rates-to-eds:
+    name: Trigger rates sync in EDS repo
+    if: github.ref == 'refs/heads/main'
+    needs: [build-and-deploy, smoke-test]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch rates-changed to kynetic-trust
+        env:
+          EDS_DISPATCH_TOKEN: ${{ secrets.EDS_DISPATCH_TOKEN }}
+        run: |
+          curl -sf -X POST \
+            -H "Authorization: Bearer $EDS_DISPATCH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/znikolovski/kynetic-trust/dispatches" \
+            -d '{"event_type":"rates-changed","client_payload":{"sourceCommit":"${{ github.sha }}"}}'
+
   release-to-eds:
     if: github.ref == 'refs/heads/main'
     needs: [build-and-deploy, smoke-test]
