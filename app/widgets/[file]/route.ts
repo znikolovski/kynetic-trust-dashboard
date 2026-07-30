@@ -1,13 +1,10 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-
-const ALLOWED_ORIGIN =
-  process.env.WIDGET_ALLOWED_ORIGINS?.split(',')[0]?.trim() ??
-  'https://www.securbank.com';
+import { corsHeaders } from '@/lib/cors';
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ file: string }> },
 ) {
   const { file } = await params;
@@ -16,6 +13,9 @@ export async function GET(
   if (!/^[\w-]+\.(js|json)$/.test(file)) {
     return new NextResponse('Not Found', { status: 404 });
   }
+
+  const origin = request.headers.get('origin');
+  const { 'Access-Control-Allow-Origin': allowOrigin } = corsHeaders(origin);
 
   try {
     const content = await readFile(
@@ -27,7 +27,7 @@ export async function GET(
         'Content-Type': isJson
           ? 'application/json; charset=utf-8'
           : 'application/javascript; charset=utf-8',
-        'Access-Control-Allow-Origin': ALLOWED_ORIGIN,
+        'Access-Control-Allow-Origin': allowOrigin,
         // manifest: short TTL so EDS always sees new builds promptly
         // hashed bundles: immutable — the hash changes on every rebuild
         'Cache-Control': isJson
