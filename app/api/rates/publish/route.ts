@@ -10,6 +10,38 @@ interface SavePayload {
 }
 
 const DA_SOURCE = 'https://admin.da.live/source/znikolovski/kynetic-trust/placeholders.json';
+const DASHBOARD_REPO = 'znikolovski/kynetic-trust-dashboard';
+const RATES_FILE_PATH = 'data/rates.json';
+
+async function commitRatesToGitHub(
+  pat: string,
+  ratesMap: Record<string, string>,
+): Promise<void> {
+  const fileUrl = `https://api.github.com/repos/${DASHBOARD_REPO}/contents/${RATES_FILE_PATH}`;
+  const ghHeaders = {
+    Authorization: `Bearer ${pat}`,
+    Accept: 'application/vnd.github+json',
+    'X-GitHub-Api-Version': '2022-11-28',
+    'Content-Type': 'application/json',
+  };
+
+  const currentRes = await fetch(fileUrl, { headers: ghHeaders });
+  const currentFile = currentRes.ok ? await currentRes.json() : null;
+
+  const content = Buffer.from(
+    JSON.stringify(ratesMap, null, 2) + '\n',
+  ).toString('base64');
+
+  await fetch(fileUrl, {
+    method: 'PUT',
+    headers: ghHeaders,
+    body: JSON.stringify({
+      message: 'chore(rates): update published rates',
+      content,
+      ...(currentFile?.sha ? { sha: currentFile.sha } : {}),
+    }),
+  });
+}
 
 export async function POST(req: NextRequest) {
   const daToken = process.env.DA_TOKEN;
@@ -28,6 +60,8 @@ export async function POST(req: NextRequest) {
   if (!Array.isArray(rates) || rates.length === 0) {
     return NextResponse.json({ error: 'rates must be a non-empty array' }, { status: 400 });
   }
+
+  const ratesMap = Object.fromEntries(rates.map(r => [r.key, r.display]));
 
   const sheetData = {
     total: rates.length,
@@ -57,11 +91,20 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Optionally dispatch the sync-rates GitHub Action so preview+live happen immediately.
-  // Requires GITHUB_PAT env var with actions:write permission on znikolovski/kynetic-trust.
-  let syncTriggered = false;
   const githubPat = process.env.GITHUB_PAT;
+  let ratesCommitted = false;
+  let syncTriggered = false;
+
   if (githubPat) {
+    // Persist new rates to data/rates.json in this repo (triggers Vercel redeploy)
+    try {
+      await commitRatesToGitHub(githubPat, ratesMap);
+      ratesCommitted = true;
+    } catch {
+      // non-fatal — DA write succeeded; rates.json will be stale until next manual push
+    }
+
+    // Dispatch sync-rates workflow to preview+publish to AEM CDN
     try {
       const dispatchRes = await fetch(
         'https://api.github.com/repos/znikolovski/kynetic-trust/actions/workflows/sync-rates.yml/dispatches',
@@ -78,9 +121,9 @@ export async function POST(req: NextRequest) {
       );
       syncTriggered = dispatchRes.ok;
     } catch {
-      // non-fatal — rates are saved in DA regardless
+      // non-fatal
     }
   }
 
-  return NextResponse.json({ ok: true, stored: rates.length, syncTriggered });
+  return NextResponse.json({ ok: true, stored: rates.length, ratesCommitted, syncTriggered });
 }

@@ -65,18 +65,10 @@ const BLANK_STEPS: PublishStep[] = [
   { id: 'sync', label: 'Dispatching sync workflow', status: 'idle' },
 ];
 
-const AEM_URL = 'https://main--kynetic-trust--znikolovski.aem.live/placeholders.json';
-
 async function fetchRatesData(): Promise<ValueMap> {
-  const res = await fetch(AEM_URL, { cache: 'no-store' });
+  const res = await fetch('/api/admin/rates', { cache: 'no-store' });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const json = await res.json();
-  const items: Array<{ Key: string; Value: string }> = Array.isArray(json) ? json : (json.data ?? []);
-  const map: ValueMap = {};
-  for (const item of items) {
-    if (item.Key) map[item.Key] = item.Value;
-  }
-  return map;
+  return res.json() as Promise<ValueMap>;
 }
 
 const mono10: React.CSSProperties = {
@@ -301,7 +293,7 @@ export default function RatesPage() {
               type="button"
               onClick={fetchRates}
               disabled={fetchState === 'loading'}
-              aria-label="Refresh rates from AEM"
+              aria-label="Refresh rates"
               style={{
                 background: 'none',
                 border: '1px solid var(--color-outline-variant)',
