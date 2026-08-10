@@ -162,7 +162,6 @@ export default function RatesPage() {
   };
 
   useEffect(() => {
-    setFetchState('loading');
     fetchRatesData()
       .then(map => {
         setLiveValues(map);
