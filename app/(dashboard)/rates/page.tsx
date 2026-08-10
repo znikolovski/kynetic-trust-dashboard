@@ -67,6 +67,18 @@ const BLANK_STEPS: PublishStep[] = [
 
 const AEM_URL = 'https://main--kynetic-trust--znikolovski.aem.live/placeholders.json';
 
+async function fetchRatesData(): Promise<ValueMap> {
+  const res = await fetch(AEM_URL, { cache: 'no-store' });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const json = await res.json();
+  const items: Array<{ Key: string; Value: string }> = Array.isArray(json) ? json : (json.data ?? []);
+  const map: ValueMap = {};
+  for (const item of items) {
+    if (item.Key) map[item.Key] = item.Value;
+  }
+  return map;
+}
+
 const mono10: React.CSSProperties = {
   fontFamily: 'var(--font-mono)',
   fontSize: 10,
@@ -133,31 +145,35 @@ export default function RatesPage() {
 
   const pendingCount = Object.keys(editedValues).filter(k => editedValues[k] !== liveValues[k]).length;
 
-  const fetchRates = async () => {
+  const applyRates = (map: ValueMap) => {
+    setLiveValues(map);
+    setEditedValues(map);
+    setLastSync(new Date());
+    setFetchState('ok');
+  };
+
+  const fetchRates = () => {
     setFetchState('loading');
     setFetchError('');
-    try {
-      const res = await fetch(AEM_URL, { cache: 'no-store' });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const json = await res.json();
-      const items: Array<{ Key: string; Value: string }> = Array.isArray(json) ? json : (json.data ?? []);
-      const map: ValueMap = {};
-      for (const item of items) {
-        if (item.Key) map[item.Key] = item.Value;
-      }
-      setLiveValues(map);
-      setEditedValues(map);
-      setLastSync(new Date());
-      setFetchState('ok');
-    } catch (err) {
+    fetchRatesData().then(applyRates).catch(err => {
       setFetchError(err instanceof Error ? err.message : 'Unknown error');
       setFetchState('error');
-    }
+    });
   };
 
   useEffect(() => {
-    void fetchRates();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    setFetchState('loading');
+    fetchRatesData()
+      .then(map => {
+        setLiveValues(map);
+        setEditedValues(map);
+        setLastSync(new Date());
+        setFetchState('ok');
+      })
+      .catch(err => {
+        setFetchError(err instanceof Error ? err.message : 'Unknown error');
+        setFetchState('error');
+      });
   }, []);
 
   const handleDiscard = () => {
