@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 
 type ValueMap = Record<string, string>;
 type StepStatus = 'idle' | 'running' | 'ok' | 'error';
@@ -133,7 +133,7 @@ export default function RatesPage() {
 
   const pendingCount = Object.keys(editedValues).filter(k => editedValues[k] !== liveValues[k]).length;
 
-  const fetchRates = useCallback(async () => {
+  const fetchRates = async () => {
     setFetchState('loading');
     setFetchError('');
     try {
@@ -153,11 +153,12 @@ export default function RatesPage() {
       setFetchError(err instanceof Error ? err.message : 'Unknown error');
       setFetchState('error');
     }
-  }, []);
+  };
 
   useEffect(() => {
-    fetchRates();
-  }, [fetchRates]);
+    void fetchRates();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleDiscard = () => {
     setEditedValues({ ...liveValues });
