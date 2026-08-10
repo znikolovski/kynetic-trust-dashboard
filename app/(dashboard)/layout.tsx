@@ -9,6 +9,7 @@ const NAV_ITEMS = [
   { href: '/markets', label: 'Markets', icon: 'trending_up' },
   { href: '/portfolio', label: 'Portfolio', icon: 'grid_view' },
   { href: '/transactions', label: 'Transactions', icon: 'receipt_long' },
+  { href: '/rates', label: 'Rates', icon: 'percent' },
   { href: '/settings', label: 'Settings', icon: 'settings' },
 ] as const;
 
