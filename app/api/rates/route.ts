@@ -60,7 +60,7 @@ export async function GET(req: NextRequest) {
       ...r,
       display: liveDisplay,
       numeric: parseNumeric(liveDisplay),
-      effectiveDate: new Date().toISOString().split('T')[0],
+      effectiveDate: new Date().toISOString().split('T')[0] ?? '',
     };
   });
 
