@@ -80,17 +80,20 @@ const WIDGET_CSS = `
 type Props = {
   apiBase?: string;
   onReady: () => void;
+  onEmpty: () => void;
 };
 
 export default function TransactionSummary({
   apiBase = 'https://app.securbank.com',
   onReady,
+  onEmpty,
 }: Props) {
   const [isAuthenticated, setIsAuthenticated] = useState(
     () => !!getSessionUserInfo(),
   );
   const [metrics, setMetrics] = useState<TransactionMetrics[]>([]);
-  const readyFired = useRef(false);
+  // Track the last signal sent so we only re-signal on actual state transitions.
+  const lastSignal = useRef<'none' | 'empty' | 'ready'>('none');
 
   // Track auth state driven by sb-auth-change events (EDS header fires these)
   useEffect(() => {
@@ -113,14 +116,22 @@ export default function TransactionSummary({
       .catch(() => {});
   }, [isAuthenticated, apiBase]);
 
-  // Fire onReady exactly once so the EDS mount div becomes visible and the
-  // 6-second READY_TIMEOUT_MS is cleared. The section has padding: 0, so when
-  // this component renders null the section is truly invisible (0 height).
+  // Signal the EDS block whether we have content or not so it can
+  // show/hide the section without reserving blank space.
   useEffect(() => {
-    if (readyFired.current) return;
-    readyFired.current = true;
-    onReady();
-  }, [onReady]);
+    if (!isAuthenticated) {
+      if (lastSignal.current !== 'empty') {
+        lastSignal.current = 'empty';
+        onEmpty();
+      }
+    } else if (metrics.length > 0) {
+      if (lastSignal.current !== 'ready') {
+        lastSignal.current = 'ready';
+        onReady();
+      }
+    }
+    // isAuthenticated but metrics not yet loaded: wait — neither signal fires
+  }, [isAuthenticated, metrics.length, onEmpty, onReady]);
 
   if (!isAuthenticated || metrics.length === 0) return null;
 

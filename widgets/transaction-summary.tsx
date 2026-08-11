@@ -33,6 +33,11 @@ class TransactionSummaryElement extends HTMLElement {
             new CustomEvent('sb-widget-ready', { bubbles: true, composed: true }),
           )
         }
+        onEmpty={() =>
+          this.dispatchEvent(
+            new CustomEvent('sb-widget-empty', { bubbles: true, composed: true }),
+          )
+        }
       />,
     );
   }
