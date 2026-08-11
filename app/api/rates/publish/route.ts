@@ -9,7 +9,6 @@ interface SavePayload {
   rates: RateEntry[];
 }
 
-const DA_SOURCE = 'https://admin.da.live/source/znikolovski/kynetic-trust/placeholders.json';
 const DASHBOARD_REPO = 'znikolovski/kynetic-trust-dashboard';
 const RATES_FILE_PATH = 'data/rates.json';
 
@@ -44,9 +43,9 @@ async function commitRatesToGitHub(
 }
 
 export async function POST(req: NextRequest) {
-  const daToken = process.env.DA_TOKEN;
-  if (!daToken) {
-    return NextResponse.json({ error: 'DA_TOKEN not configured' }, { status: 503 });
+  const githubPat = process.env.GITHUB_PAT;
+  if (!githubPat) {
+    return NextResponse.json({ error: 'GITHUB_PAT not configured' }, { status: 503 });
   }
 
   let body: SavePayload;
@@ -63,67 +62,36 @@ export async function POST(req: NextRequest) {
 
   const ratesMap = Object.fromEntries(rates.map(r => [r.key, r.display]));
 
-  const sheetData = {
-    total: rates.length,
-    offset: 0,
-    limit: rates.length,
-    data: rates.map(r => ({ Key: r.key, Value: r.display })),
-    ':type': 'sheet',
-  };
-
-  const formData = new FormData();
-  formData.append(
-    'data',
-    new Blob([JSON.stringify(sheetData)], { type: 'application/json' }),
-  );
-
-  const daRes = await fetch(DA_SOURCE, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${daToken}` },
-    body: formData,
-  });
-
-  if (!daRes.ok) {
-    const detail = await daRes.text().catch(() => '');
-    return NextResponse.json(
-      { error: `DA write failed: HTTP ${daRes.status}`, detail },
-      { status: 502 },
-    );
+  // 1. Commit data/rates.json to this repo — makes the dashboard the source of truth
+  //    and triggers a Vercel redeploy so /api/rates serves the updated values.
+  try {
+    await commitRatesToGitHub(githubPat, ratesMap);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'GitHub commit failed';
+    return NextResponse.json({ error: message }, { status: 502 });
   }
 
-  const githubPat = process.env.GITHUB_PAT;
-  let ratesCommitted = false;
+  // 2. Dispatch the sync-rates workflow in kynetic-trust — it reads from /api/rates,
+  //    writes to DA, and triggers EDS preview+live. DA_TOKEN is not needed here.
   let syncTriggered = false;
-
-  if (githubPat) {
-    // Persist new rates to data/rates.json in this repo (triggers Vercel redeploy)
-    try {
-      await commitRatesToGitHub(githubPat, ratesMap);
-      ratesCommitted = true;
-    } catch {
-      // non-fatal — DA write succeeded; rates.json will be stale until next manual push
-    }
-
-    // Dispatch sync-rates workflow to preview+publish to AEM CDN
-    try {
-      const dispatchRes = await fetch(
-        'https://api.github.com/repos/znikolovski/kynetic-trust/actions/workflows/sync-rates.yml/dispatches',
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${githubPat}`,
-            Accept: 'application/vnd.github+json',
-            'X-GitHub-Api-Version': '2022-11-28',
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ ref: 'main' }),
+  try {
+    const dispatchRes = await fetch(
+      'https://api.github.com/repos/znikolovski/kynetic-trust/actions/workflows/sync-rates.yml/dispatches',
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${githubPat}`,
+          Accept: 'application/vnd.github+json',
+          'X-GitHub-Api-Version': '2022-11-28',
+          'Content-Type': 'application/json',
         },
-      );
-      syncTriggered = dispatchRes.ok;
-    } catch {
-      // non-fatal
-    }
+        body: JSON.stringify({ ref: 'main' }),
+      },
+    );
+    syncTriggered = dispatchRes.ok;
+  } catch {
+    // non-fatal — rates are committed; sync will run on next schedule
   }
 
-  return NextResponse.json({ ok: true, stored: rates.length, ratesCommitted, syncTriggered });
+  return NextResponse.json({ ok: true, stored: rates.length, ratesCommitted: true, syncTriggered });
 }
