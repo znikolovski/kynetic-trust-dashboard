@@ -9,14 +9,12 @@ const nextConfig = {
       { protocol: 'https', hostname: 'delivery-*.adobeaemcloud.com' },
     ],
   },
-  experimental: {
-    // Bundle public/widgets/* into the Lambda so the /widgets/[file] Route
-    // Handler can read them at runtime. The @vercel/next adapter does not
-    // bundle gitignored public/ files via its static output; the Route
-    // Handler is the reliable serving path (and owns the CORS headers too).
-    outputFileTracingIncludes: {
-      '/widgets/[file]': ['./public/widgets/**'],
-    },
+  // Bundle public/widgets/* into the Lambda so the /widgets/[file] Route
+  // Handler can read them at runtime. The @vercel/next adapter does not
+  // bundle gitignored public/ files via its static output; the Route
+  // Handler is the reliable serving path (and owns the CORS headers too).
+  outputFileTracingIncludes: {
+    '/widgets/[file]': ['./public/widgets/**'],
   },
   async headers() {
     return [

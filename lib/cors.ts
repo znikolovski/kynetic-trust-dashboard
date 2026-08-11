@@ -5,7 +5,8 @@ const ALLOWED_ORIGINS = (process.env.WIDGET_ALLOWED_ORIGINS ?? 'https://www.secu
     return t.includes('://') ? t : `https://${t}`;
   });
 
-// AEM EDS CDN hostnames always allowed for widget embedding
+// AEM EDS CDN hostnames always allowed for widget embedding.
+// run.place is the AEM EDS branded-domain service (same trust level as *.aem.page).
 function isAemOrigin(origin: string): boolean {
   try {
     const { hostname } = new URL(origin);
@@ -14,6 +15,7 @@ function isAemOrigin(origin: string): boolean {
       || hostname.endsWith('.aem.live')
       || hostname.endsWith('.hlx.page')
       || hostname.endsWith('.hlx.live')
+      || hostname.endsWith('.run.place')
     );
   } catch {
     return false;
